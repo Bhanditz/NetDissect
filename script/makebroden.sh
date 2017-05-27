@@ -4,6 +4,12 @@ set -e
 # Start from parent directory of script
 cd "$(dirname "$(dirname "$(readlink -f "$0")")")"
 
+# Make the sourcedata directory if it does not exist
+if [ ! -d sourcedata ]
+then
+  mkdir sourcedata
+fi
+
 # PASCAL 2010 Images
 if [ ! -f sourcedata/pascal/VOC2010/ImageSets/Segmentation/train.txt ]
 then
