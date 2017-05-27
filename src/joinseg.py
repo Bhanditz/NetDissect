@@ -786,7 +786,7 @@ if __name__ == '__main__':
     import argparse
     import adeseg
     import dtdseg
-    import osseg
+    import mincseg
     import pascalseg
     from synonym import synonyms
 
@@ -803,19 +803,20 @@ if __name__ == '__main__':
 
     print 'CREATING NEW SEGMENTATION OF SIZE %d.\n' % args.size
     print 'Loading source segmentations.'
+    # OpenSurfaces is not balanced in scene and object types.
+    minc = mincseg.MincSegmentation('sourcedata/minc/',
+            supply=set(['material', 'color']))
     ade = adeseg.AdeSegmentation('sourcedata/ade20k', 'ADE20K_2016_07_26')
     dtd = dtdseg.DtdSegmentation('sourcedata/dtd/dtd-r1.0.1')
-    # OpenSurfaces is not balanced in scene and object types.
-    oss = osseg.OpenSurfaceSegmentation('sourcedata/opensurfaces/',
-            supply=set(['material', 'color']))
     # Remove distinction between upper-arm, lower-arm, etc.
     pascal = pascalseg.PascalSegmentation('sourcedata/pascal/',
             collapse_adjectives=set([
                 'left', 'right', 'front', 'back', 'upper', 'lower', 'side']))
-    data = OrderedDict(ade20k=ade, dtd=dtd, opensurfaces=oss, pascal=pascal)
+    # data = OrderedDict(ade20k=ade, dtd=dtd, minc=minc, pascal=pascal)
+    data = OrderedDict(minc=minc)
     unify(data,
             splits=OrderedDict(train=0.7, val=0.3),
             size=image_size, segmentation_size=seg_size,
-            directory=('dataset/broden1_%d' % args.size),
-            synonyms=synonyms,
+            directory=('dataset/broden2_%d' % args.size),
+            synonyms=synonyms, test_limit=99, # single_process=True,
             min_frequency=10, min_coverage=0.5, verbose=True)
