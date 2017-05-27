@@ -5,12 +5,12 @@ set -e
 cd "$(dirname "$(dirname "$(readlink -f "$0")")")"
 
 # PASCAL 2010 Images
-if [ ! -f dataset/pascal/VOC2010/ImageSets/Segmentation/train.txt ]
+if [ ! -f sourcedata/pascal/VOC2010/ImageSets/Segmentation/train.txt ]
 then
 
 echo "Downloading Pascal VOC2010 images"
-mkdir -p dataset/pascal
-pushd dataset/pascal
+mkdir -p sourcedata/pascal
+pushd sourcedata/pascal
 wget --progress=bar \
    http://host.robots.ox.ac.uk/pascal/VOC/voc2010/VOCtrainval_03-May-2010.tar \
    -O VOCtrainval_03-May-2010.tar
@@ -23,15 +23,15 @@ popd
 fi
 
 
-# PASCAL Part dataset
-if [ ! -f dataset/pascal/part/part2ind.m ]
+# PASCAL Part sourcedata
+if [ ! -f sourcedata/pascal/part/part2ind.m ]
 then
 
 echo "Downloading Pascal Part Dataset"
-mkdir -p dataset/pascal/part
-pushd dataset/pascal/part
+mkdir -p sourcedata/pascal/part
+pushd sourcedata/pascal/part
 wget --progress=bar \
-   http://www.stat.ucla.edu/~xianjie.chen/pascal_part_dataset/trainval.tar.gz \
+   http://www.stat.ucla.edu/~xianjie.chen/pascal_part_sourcedata/trainval.tar.gz \
    -O trainval.tar.gz
 tar xvfz trainval.tar.gz
 rm trainval.tar.gz
@@ -40,13 +40,13 @@ popd
 fi
 
 
-# PASCAL Context dataset
-if [ ! -f dataset/pascal/context/labels.txt ]
+# PASCAL Context sourcedata
+if [ ! -f sourcedata/pascal/context/labels.txt ]
 then
 
 echo "Downloading Pascal Context Dataset"
-mkdir -p dataset/pascal/context
-pushd dataset/pascal/context
+mkdir -p sourcedata/pascal/context
+pushd sourcedata/pascal/context
 wget --progress=bar \
    http://www.cs.stanford.edu/~roozbeh/pascal-context/trainval.tar.gz \
    -O trainval.tar.gz
@@ -58,12 +58,12 @@ fi
 
 
 # DTD
-if [ ! -f dataset/dtd/dtd-r1.0.1/imdb/imdb.mat ]
+if [ ! -f sourcedata/dtd/dtd-r1.0.1/imdb/imdb.mat ]
 then
 
 echo "Downloading Describable Textures Dataset"
-mkdir -p dataset/dtd
-pushd dataset/dtd
+mkdir -p sourcedata/dtd
+pushd sourcedata/dtd
 wget --progress=bar \
    https://www.robots.ox.ac.uk/~vgg/data/dtd/download/dtd-r1.0.1.tar.gz \
    -O dtd-r1.0.1.tar.gz
@@ -76,12 +76,12 @@ fi
 
 
 # OpenSurfaces
-if [ ! -f dataset/opensurfaces/photos.csv ]
+if [ ! -f sourcedata/opensurfaces/photos.csv ]
 then
 
 echo "Downloading OpenSurfaces Dataset"
-mkdir -p dataset/opensurfaces
-pushd dataset/opensurfaces
+mkdir -p sourcedata/opensurfaces
+pushd sourcedata/opensurfaces
 wget --progress=bar \
    http://labelmaterial.s3.amazonaws.com/release/opensurfaces-release-0.zip \
    -O opensurfaces-release-0.zip
@@ -98,14 +98,14 @@ fi
 
 
 # ADE20K
-if [ ! -f dataset/ade20k/index_ade20k.mat ]
+if [ ! -f sourcedata/ade20k/ADE20K_2016_07_26/index_ade20k.mat ]
 then
 
 echo "Downloading ADE20K Dataset"
-mkdir -p dataset/ade20k
-pushd dataset/ade20k
+mkdir -p sourcedata/ade20k
+pushd sourcedata/ade20k
 wget --progress=bar \
-   http://groups.csail.mit.edu/vision/datasets/ADE20K/ADE20K_2016_07_26.zip \
+   http://groups.csail.mit.edu/vision/sourcedatas/ADE20K/ADE20K_2016_07_26.zip \
    -O ADE20K_2016_07_26.zip
 unzip ADE20K_2016_07_26.zip
 rm ADE20K_2016_07_26.zip

@@ -803,13 +803,13 @@ if __name__ == '__main__':
 
     print 'CREATING NEW SEGMENTATION OF SIZE %d.\n' % args.size
     print 'Loading source segmentations.'
-    ade = adeseg.AdeSegmentation('dataset/ade20k', 'ADE20K_2016_07_26')
-    dtd = dtdseg.DtdSegmentation('dataset/dtd/dtd-r1.0.1')
+    ade = adeseg.AdeSegmentation('sourcedata/ade20k', 'ADE20K_2016_07_26')
+    dtd = dtdseg.DtdSegmentation('sourcedata/dtd/dtd-r1.0.1')
     # OpenSurfaces is not balanced in scene and object types.
-    oss = osseg.OpenSurfaceSegmentation('dataset/opensurfaces/',
+    oss = osseg.OpenSurfaceSegmentation('sourcedata/opensurfaces/',
             supply=set(['material', 'color']))
     # Remove distinction between upper-arm, lower-arm, etc.
-    pascal = pascalseg.PascalSegmentation('dataset/pascal/',
+    pascal = pascalseg.PascalSegmentation('sourcedata/pascal/',
             collapse_adjectives=set([
                 'left', 'right', 'front', 'back', 'upper', 'lower', 'side']))
     data = OrderedDict(ade20k=ade, dtd=dtd, opensurfaces=oss, pascal=pascal)
