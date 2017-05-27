@@ -8,23 +8,10 @@
 # Start from parent directory of script
 cd "$(dirname "$(dirname "$(readlink -f "$0")")")"
 
-# Remove dummy directories from git using sparse-checkout
-if [ -e .git/info ]
-then
-git config core.sparsecheckout true
-cat << EOF >> .git/info/sparse-checkout
-!dataset/*
-!dissection/*
-!sourcedata/*
-!zoo/*
-/*
-EOF
-fi
-
 # Remove dummy directories
 for DUMMY in dataset dissection sourcedata zoo
 do
-  if [ -L ${dummy} ]
+  if [ -h ${DUMMY} ]
   then
     rm ${DUMMY}
     echo "Removed link ${DUMMY}"
@@ -38,3 +25,17 @@ do
   ln -s --target-directory=. ~/ndlinks/${DUMMY}
   echo "Created link ${DUMMY}"
 done
+
+# Remove dummy directories from git using sparse-checkout
+if [ -e .git/info ]
+then
+git config core.sparsecheckout true
+cat << EOF >> .git/info/sparse-checkout
+!dataset/*
+!dissection/*
+!zoo/*
+/*
+EOF
+git read-tree -mu HEAD
+# git checkout dataset dissection zoo
+fi
