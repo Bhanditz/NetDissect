@@ -3,7 +3,7 @@ import numpy
 import csv
 import colorname
 from loadseg import AbstractSegmentation
-from scipy.misc import imread
+from skimage.io import imread
 
 # Files in the MINC-S segmentation test set:
 # DIR/minc/minc-s/categories.txt
@@ -74,9 +74,16 @@ class MincSegmentation(AbstractSegmentation):
         fnjpg = os.path.join(directory, row['photo'])
         result = {}
         if wants('material', categories) and wants('material', supply):
+            mats = {}
+            for material, fn in row['segments']:
+                mask = imread(os.path.join(directory, fn)) != 0
+                if material not in mats:
+                    mats[material] = mask
+                else:
+                    mats[material] |= mask
             allmats = numpy.concatenate([
-                material * imread(os.path.join(directory, fn))[None,:,:]
-                for material, fn in row['segments']])
+                material * fn[None,:,:]
+                for material, fn in sorted(mats.items(), key=lambda x: x[0])])
             result['material'] = allmats
         if wants('color', categories) and wants('color', supply):
             result['color'] = colorname.label_major_colors(imread(fnjpg)) + 1
