@@ -115,7 +115,7 @@ common_names = {
 'aeroplane': ['airplane'],
 'airplane': ['airplane', 'aeroplane', 'plane'],
 'spectacles': ['eyeglasses'],
-'windopane': ['window'],  # ade20k calls windows windowpanes.
+'windowpane': ['window'],  # ade20k calls windows windowpanes.
 'dog': ['dog', 'domestic dog', 'canis familiaris'],
 'alga': ['algae'],
 'bicycle': ['bicycle', 'bike', 'cycle'],
