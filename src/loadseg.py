@@ -211,17 +211,18 @@ class SegmentationData(AbstractSegmentation):
                 imap = numpy.concatenate((imap, numpy.zeros(
                     self.label_size(None) - len(imap), dtype=imap.dtype)))
             catmap[cat] = imap
-        # For each label, find the category with maximum coverage.
+        # For each label, find the category with maximum in-category-coverage.
         result = []
         for i in range(self.label_size(None)):
             maxcov, maxcat = max(
-                    (self.coverage(cat, catmap[cat][i])
-                        if catmap[cat][i] else 0, ic)
+                    (((self.coverage(cat, catmap[cat][i]) /
+                        self.category[cat]['frequency'])
+                        if catmap[cat][i] else 0),
+                        ic)
                     for ic, cat in enumerate(categories))
             result.append(maxcat)
         # Return the max-coverage cateogry for each label.
         return numpy.array(result)
-
 
     def segmentation_data(self, category, i, c=0, full=False, out=None):
         '''

@@ -24,6 +24,9 @@ class MincSegmentation(AbstractSegmentation):
                 material_name_map[line.strip()] = z + 1
         self.material_names = ['-'] * (1 + max(material_name_map.values()))
         for k, v in material_name_map.items():
+            # Treat the catch-all label as no-label.
+            if k == 'other':
+                k = '-'
             self.material_names[v] = k
         # Process segment information: open test-segments.txt
         photo_segments = {}

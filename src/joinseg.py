@@ -137,6 +137,7 @@ warnings.filterwarnings('ignore',  r'.*the output shape of zoom().*')
 
 def unify(data_sets, directory, size=None, segmentation_size=None, crop=False,
         splits=None, min_frequency=None, min_coverage=None,
+        sample_frequency=None, sample_coverage=None,
         synonyms=None, test_limit=None, single_process=False, verbose=False):
     # Make sure we have a directory to work in
     directory = os.path.expanduser(directory)
@@ -148,6 +149,8 @@ def unify(data_sets, directory, size=None, segmentation_size=None, crop=False,
         ('segmentation_size', segmentation_size), ('crop', crop),
         ('splits', splits),
         ('min_frequency', min_frequency), ('min_coverage', min_coverage),
+        ('sample_frequency', sample_frequency),
+        ('sample_coverage', sample_coverage),
         ('synonyms', synonyms), ('test_limit', test_limit),
         ('single_process', single_process)],
         directory=directory, verbose=verbose)
@@ -163,7 +166,7 @@ def unify(data_sets, directory, size=None, segmentation_size=None, crop=False,
     # Phase 1: Count label statistics
     # frequency = number of images touched by each label
     # coverage  = total portion of images covered by each label
-    frequency, coverage = gather_label_statistics(
+    frequency, coverage, stats = gather_label_statistics(
             data_sets, test_limit, single_process,
             segmentation_size, crop, verbose)
     # Phase 2: Sort, collapse, and filter labels
@@ -172,13 +175,64 @@ def unify(data_sets, directory, size=None, segmentation_size=None, crop=False,
     # Phase 3: Filter by frequncy, and assign numbers
     names, assignments = assign_labels(
             labnames, frequency, coverage, min_frequency, min_coverage, verbose)
-    # Phase 4: Collate and output label stats
+    # Phase 4: Subsample the images to obtain a diverse subset
+    subset = choose_diverse_subset(
+            stats, frequency, coverage, names, assignments,
+            sample_frequency, sample_coverage)
+    # Phase 5: Collate and output label stats
     cats = write_label_files(
-            directory, names, assignments, frequency, coverage, syns, verbose)
-    # Phase 5: Create normalized segmentation files
+            directory, names, assignments, subset, stats, syns, verbose)
+    # Phase 6: Create normalized segmentation files
     create_segmentations(
             directory, data_sets, splits, assignments, size, segmentation_size,
-            crop, cats, test_limit, single_process, verbose)
+            crop, cats, subset, test_limit, single_process, verbose)
+
+def choose_diverse_subset(
+        stats, frequency, coverage, names, assignments,
+        sample_frequency, sample_coverage):
+    '''
+    Phase 4 of unification.  Creates a small subset.
+    '''
+    if sample_frequency is None and sample_coverage is None:
+        return None
+    # We need an (index, category) count
+    ic_freq = join_histogram(frequency, assignments)
+    ic_cov = join_histogram(coverage, assignments)
+    # Accumulate all the candidate representative images
+    candidates = [[] for _ in names]
+    for i, stat in enumerate(stats):
+        im_freq, im_cov = (join_histogram(hist, assignments) for hist in stat)
+        for k in im_freq:
+            score = -sum(1.0 / ic_cov[k] for j in im_freq
+                    if (ic_freq[j], ic_cov[j]) > (ic_freq[k], ic_cov[k]))
+            candidates[k].append((-score, i))
+    # sort candidates, preferring instances which have more rare labels
+    for clist in candidates:
+        clist.sort()
+    # starting from lowest-coverage labels, make sure we have enough samples
+    chosen_coverage = {}
+    chosen_frequency = {}
+    included = set()
+    for k in sorted(ic_freq.keys(), key=lambda x: (ic_freq[x], ic_cov[x])):
+        # Skip the no-label label
+        if k == 0:
+            continue;
+        # Pick best candidate images until we have enough of this label
+        for score, cand in candidates[k]:
+            if (sample_frequency is None or
+                    chosen_frequency.get(k, 0) >= sample_frequency) and (
+                sample_coverage is None or
+                    chosen_coverage.get(k, 0) >= sample_coverage):
+                break
+            if cand in included:
+                continue
+            included.add(cand)
+            im_freq, im_cov = (
+                    join_histogram(h, assignments)
+                    for h in stats[cand])
+            accumulate_histogram(chosen_coverage, im_cov)
+            accumulate_histogram(chosen_frequency, im_freq)
+    return included
 
 def gather_label_statistics(data_sets, test_limit, single_process,
         segmentation_size, crop, verbose):
@@ -196,7 +250,7 @@ def gather_label_statistics(data_sets, test_limit, single_process,
     # Add them up
     frequency, coverage = (sum_histogram(d) for d in zip(*stats))
     # TODO: also, blacklist images that have insufficient labled pixels
-    return frequency, coverage
+    return frequency, coverage, stats
 
 def normalize_labels(data_sets, frequency, coverage, synonyms):
     '''
@@ -274,11 +328,15 @@ def assign_labels(
     return names, assignments
 
 def write_label_files(
-        directory, names, assignments, frequency, coverage, syns, verbose):
+        directory, names, assignments, subset, stats, syns, verbose):
     '''
-    Phase 4 of unification.
+    Phase 5 of unification.
     Collate some stats and then write then to two metadata files.
     '''
+    # Count frequency and coverage within sampled images
+    sampled_stats = [stat for i, stat in enumerate(stats)
+            if subset is None or i in subset]
+    frequency, coverage = (sum_histogram(d) for d in zip(*sampled_stats))
     # Make lists of synonyms claimed by each label
     synmap = invert_dict(dict((w, assignments[lab]) for w, lab in syns.items()))
     # We need an (index, category) count
@@ -345,9 +403,10 @@ def write_label_files(
     return cats
 
 def create_segmentations(directory, data_sets, splits, assignments, size,
-        segmentation_size, crop, cats, test_limit, single_process, verbose):
+        segmentation_size, crop, cats, subset, test_limit,
+        single_process, verbose):
     '''
-    Phase 5 of unification.  Create the normalized segmentation files
+    Last phase of unification.  Create the normalized segmentation files
     '''
     if size is not None and segmentation_size is None:
         segmentation_size = size
@@ -369,7 +428,7 @@ def create_segmentations(directory, data_sets, splits, assignments, size,
                 categories=cats,
                 crop=crop,
                 verbose=verbose),
-            all_dataset_segmentations(data_sets, test_limit),
+            all_dataset_segmentations(data_sets, test_limit, subset),
             single_process=single_process,
             verbose=verbose)
     # Sort nonempty itesm randomly+reproducibly by md5 hash of the filename.
@@ -494,10 +553,11 @@ def join_histogram(histogram, newkeys):
     '''Rekeys histogram according to newkeys map, summing joined buckets.'''
     result = {}
     for oldkey, newkey in newkeys.iteritems():
-        if newkey not in result:
-            result[newkey] = histogram[oldkey]
-        else:
-            result[newkey] += histogram[oldkey]
+        if oldkey in histogram:
+            if newkey not in result:
+                result[newkey] = histogram[oldkey]
+            else:
+                result[newkey] += histogram[oldkey]
     return result
 
 def sum_histogram(histogram_list):
@@ -510,6 +570,14 @@ def sum_histogram(histogram_list):
             else:
                 result[k] += v
     return result
+
+def accumulate_histogram(accumulator, histogram):
+    '''Accumulates histogram dictionary elementwise.'''
+    for k, v in histogram.iteritems():
+        if k in accumulator:
+            accumulator[k] += v
+        else:
+            accumulator[k] = v
 
 def invert_dict(d):
     '''Transforms {k: v} to {v: [k,k..]}'''
@@ -556,7 +624,7 @@ def count_label_statistics(record, segmentation_size, crop, verbose):
                     coverage[key] = float(bc[label]) / pixels
     return freq, coverage
 
-def all_dataset_segmentations(data_sets, test_limit=None):
+def all_dataset_segmentations(data_sets, test_limit=None, subset=None):
     '''
     Returns an iterator for metadata over all segmentations
     for all images in all the datasets.  The iterator iterates over
@@ -565,7 +633,8 @@ def all_dataset_segmentations(data_sets, test_limit=None):
     j = 0
     for name, ds in data_sets.items():
         for i in truncate_range(range(ds.size()), test_limit):
-            yield (name, j, ds.__class__, ds.filename(i), ds.metadata(i))
+            if subset is None or j in subset:
+                yield (name, j, ds.__class__, ds.filename(i), ds.metadata(i))
             j += 1
 
 def truncate_range(data, limit):
@@ -820,5 +889,6 @@ if __name__ == '__main__':
             splits=OrderedDict(train=0.7, val=0.3),
             size=image_size, segmentation_size=seg_size,
             directory=('dataset/broden2_%d' % args.size),
-            synonyms=synonyms, # test_limit=99, single_process=True,
+            synonyms=synonyms, # test_limit=19, # single_process=True,
+            sample_frequency=3, sample_coverage=0.1,
             min_frequency=10, min_coverage=0.5, verbose=True)
