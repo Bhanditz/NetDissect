@@ -1,22 +1,14 @@
-#!/usr/bin/env bash
+# pre-defined setting
+WORKDIR=probes
+DIR=pytorch_alexnet_imagenet
+ARCH='alexnet' # [alexnet,squeezenet1_1,resnet18,...]. It should work for all the models in https://github.com/pytorch/vision/tree/master/torchvision/models
+LAYERS="features"
+DATASET=dataset/broden1_224
+WEIGHTS="none"
+NUMCLASSES=1000
 
-# To use this, put the caffe model to be tested in the "zoo" directory
-# the following naming convention for a model called "vgg16_places365":
-#
-# zoo/caffe_reference_places365.caffemodel
-# zoo/caffe_reference_places365.prototxt
-#
-# and then, with scipy and pycaffe available in your python, run:
-#
-# ./rundissect.sh --model caffe_reference_places365 --layers "conv4 conv5"
-#
-# the output will be placed in a directory dissection/caffe_reference_places365/
-#
-# More options are listed below.
-
-# Defaults
-THRESHOLD="0.04"
-WORKDIR="dissection"
+# default setting
+THRESHOLD=0.04
 TALLYDEPTH=2048
 PARALLEL=4
 TALLYBATCH=16
@@ -27,118 +19,18 @@ CENTERED="c"
 MEAN="0 0 0"
 FORCE="none"
 ENDAFTER="none"
-MODELDIR="zoo"
-ROTATION_SEED=""
-ROTATION_POWER="1"
+RESOLUTION=100
 
-# Start from parent directory of script
-cd "$(dirname "$(dirname "$(readlink -f "$0")")")"
-
-# Parse command-line arguments. http://stackoverflow.com/questions/192249
-
-while [[ $# -gt 1 ]]
-do
-key="$1"
-
-case $key in
-    -d|--model)
-    DIR="$2"
-    shift
-    ;;
-    -w|--weights)
-    WEIGHTS="$2"
-    shift
-    ;;
-    -p|--proto)
-    PROTO="$2"
-    shift
-    ;;
-    -l|--layers)
-    LAYERS="$2"
-    shift
-    ;;
-    -s|--dataset)
-    DATASET="$2"
-    shift
-    ;;
-    --colordepth)
-    COLORDEPTH="$2"
-    shift
-    ;;
-    --resolution)
-    RESOLUTION="$2"
-    shift
-    ;;
-    --probebatch)
-    PROBEBATCH="$2"
-    shift
-    ;;
-    -t|--threshold)
-    THRESHOLD="$2"
-    shift
-    ;;
-    --tallydepth)
-    TALLYDEPTH="$2"
-    shift
-    ;;
-    --tallybatch)
-    TALLYBATCH="$2"
-    shift
-    ;;
-    --mean)
-    MEAN="$2"
-    shift
-    ;;
-    --rotation_seed)
-    ROTATION_SEED="$2"
-    shift
-    ;;
-    --rotation_power)
-    ROTATION_POWER="$2"
-    shift
-    ;;
-    -w|--workdir)
-    WORKDIR="$2"
-    shift
-    ;;
-    -f|--force)
-    FORCE="$2"
-    shift
-    ;;
-    --endafter)
-    ENDAFTER="$2"
-    shift
-    ;;
-    --gpu)
-    export CUDA_VISIBLE_DEVICES="$2"
-    shift
-    ;;
-    *)
-    echo "Unknown option" $key
-    exit 3
-    # unknown option
-    ;;
-esac
-shift # past argument or value
-done
-
-# Get rid of slashes in layer names for directory purposes
-LAYERA=(${LAYERS//\//-})
-
-# For expanding globs http://stackoverflow.com/questions/2937407
-function globexists {
-  set +f
-  test -e "$1" -o -L "$1";set -f
-}
-
-if [ -z $DIR ]; then
-  echo '--model directory' must be specified
-  exit 1
-fi
-
-if [ -z "${LAYERS}" ]; then
-  echo '--layers layers' must be specified
-  exit 1
+# Download the external model and reset the parameters
+DIR="pytorch_resnet18_places365"
+ARCH="resnet18"
+NUMCLASSES=365
+LAYERS="layer4"
+WEIGHTS=zoo/resnet18_places365.pth.tar
+if [ ! -e $WEIGHTS ]
+then
+    echo "Download the resnet18 trained on Places365"
+    wget http://places2.csail.mit.edu/models_places365/resnet18_places365.pth.tar -O $WEIGHTS
 fi
 
 # Set up directory to work in, and lay down pid file etc.
@@ -147,10 +39,11 @@ if [ -z "${FORCE##*pid*}" ] || [ ! -e $WORKDIR/$DIR/job.pid ]
 then
     exec &> >(tee -a "$WORKDIR/$DIR/job.log")
     echo "Beginning pid $$ on host $(hostname) at $(date)"
-    trap "rm -rf $WORKDIR/$DIR/job.pid" EXIT
-    echo $(hostname) $$ > $WORKDIR/$DIR/job.pid
+    trap "rm -rf $WORKDIR/$DIR/job.pid $WORKDIR/$DIR/job.host" EXIT
+    echo $$ > $WORKDIR/$DIR/job.pid
+    echo $(hostname) > $WORKDIR/$DIR/job.host
 else
-    echo "Already running $DIR at $(cat $WORKDIR/$DIR/job.pid)"
+    echo "Already running $DIR under pid $(cat $WORKDIR/$DIR/job.pid)"
     exit 1
 fi
 
@@ -165,37 +58,8 @@ then
   MEAN="109.5388 118.6897 124.6901"
 fi
 
-# Convention: dir, weights, and proto all have the same name
-if [[ -z "${WEIGHTS}" && -z "${PROTO}" ]]
-then
-  WEIGHTS="zoo/$DIR.caffemodel"
-  PROTO="zoo/$DIR.prototxt"
-fi
-
-echo DIR = "${DIR}"
-echo LAYERS = "${LAYERS}"
-echo DATASET = "${DATASET}"
-echo COLORDEPTH = "${COLORDEPTH}"
-echo RESOLUTION = "${RESOLUTION}"
-echo WORKDIR = "${WORKDIR}"
-echo WEIGHTS = "${WEIGHTS}"
-echo PROTO = "${PROTO}"
-echo THRESHOLD = "${THRESHOLD}"
-echo PROBEBATCH = "${PROBEBATCH}"
-echo TALLYDEPTH = "${TALLYDEPTH}"
-echo TALLYBATCH = "${TALLYBATCH}"
-echo MEAN = "${MEAN}"
-echo FORCE = "${FORCE}"
-echo ENDAFTER = "${ENDAFTER}"
-
-# Set up rotation flag if rotation is selected
-ROTATION_FLAG=""
-if [ ! -z "${ROTATION_SEED}" ]
-then
-    ROTATION_FLAG=" --rotation_seed ${ROTATION_SEED}
-                    --rotation_unpermute 1
-                    --rotation_power ${ROTATION_POWER} "
-fi
+# Get rid of slashes in layer names for directory purposes
+LAYERA=(${LAYERS//\//-})
 
 # Step 1: do a forward pass over the network specified by the model files.
 # The output is e.g.,: "conv5.mmap", "conv5-info.txt"
@@ -204,16 +68,15 @@ if [ -z "${FORCE##*probe*}" ] || \
 then
 
 echo 'Testing activations'
-python src/netprobe.py \
+python src/netprobe_pytorch.py \
     --directory $WORKDIR/$DIR \
     --blobs $LAYERS \
-    --weights $WEIGHTS \
-    --definition $PROTO \
-    --batch_size $PROBEBATCH \
     --mean $MEAN \
-    --colordepth $COLORDEPTH \
-    ${ROTATION_FLAG} \
+    --definition $ARCH \
+    --weights $WEIGHTS \
+    --num_classes $NUMCLASSES \
     --dataset $DATASET
+
 
 [[ $? -ne 0 ]] && exit $?
 echo netprobe > $WORKDIR/$DIR/job.done
@@ -300,37 +163,20 @@ fi
 
 
 # Step 5: we just run over the tally file to extract whatever score we
-# want to derive.  That gets summarized in a [layer]-result.csv file.
-if [ -z "${FORCE##*result*}" ] || \
+# want to derive.  That's pretty easy, so we also generate HTML at the
+# same time.
+if [ -z "${FORCE##*view*}" ] || \
+  ! ls $(printf " $WORKDIR/$DIR/html/%s.html" "${LAYERA[@]}") || \
   ! ls $(printf " $WORKDIR/$DIR/%s-result.csv" "${LAYERA[@]}")
 then
 
-echo 'Generating result.csv'
-python src/makeresult.py \
+echo 'Generating views'
+python src/viewprobe.py \
     --directory $WORKDIR/$DIR \
+    --format csv,html,quantmat \
+    --imscale 72 \
+    --imsize $RESOLUTION \
     --blobs $LAYERS
-
-[[ $? -ne 0 ]] && exit $?
-
-echo makeresult > $WORKDIR/$DIR/job.done
-fi
-
-if [ -z "${ENDAFTER##*result*}" ]
-then
-  exit 0
-fi
-
-# Step 6: now generate the HTML visualization and images.
-if [ -z "${FORCE##*report*}" ] || \
-  ! ls $(printf " $WORKDIR/$DIR/html/%s.html" "${LAYERA[@]}") || \
-  ! ls $(printf " $WORKDIR/$DIR/html/image/%s-bargraph.svg" "${LAYERA[@]}")
-then
-
-echo 'Generating report'
-python src/report.py \
-    --directory $WORKDIR/$DIR \
-    --blobs $LAYERS \
-    --threshold ${THRESHOLD}
 
 [[ $? -ne 0 ]] && exit $?
 

@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 
+# Bolei added
+import pdb
+import torch
+import torchvision
+from torch.autograd import Variable as V
+from torchvision import transforms as trn
+
 import os
 import numpy
 import glob
@@ -28,7 +35,7 @@ caffe.set_device(0)
 def create_probe(
         directory, dataset, definition, weights, mean, blobs,
         colordepth=3,
-        rotation_seed=None, rotation_power=1, rotation_unpermute=False,
+        rotation_seed=None, rotation_power=1,
         limit=None, split=None,
         batch_size=16, ahead=4,
         cl_args=None, verbose=True):
@@ -48,15 +55,31 @@ def create_probe(
     if verbose:
         print 'Opening dataset', dataset
     data = loadseg.SegmentationData(args.dataset)
-    if verbose:
-        print 'Opening network', definition
-    np = caffe_pb2.NetParameter()
-    with open(definition, 'r') as dfn_file:
-        text_format.Merge(dfn_file.read(), np)
-    net = caffe.Net(definition, weights, caffe.TEST)
-    input_blob = net.inputs[0]
-    input_dim = net.blobs[input_blob].data.shape[2:]
-    data_size = data.size(split)
+
+    # the network to dissect
+    if args.weights == None:
+        # load the imagenet pretrained model
+        net = torchvision.models.__dict__[args.definition](pretrained=True)
+    else:
+        # load your own model
+        net = torchvision.models.__dict__[args.definition](num_classes=args.num_classes)
+        checkpoint = torch.load(args.weights)
+        state_dict = {str.replace(k,'module.',''): v for k,v in checkpoint['state_dict'].iteritems()} # the data parallel layer will add 'module' before each layer name
+        net.load_state_dict(state_dict)
+    net.eval()
+    # hook up to get the information for each selected layer
+    layers = net._modules.keys()
+    size_blobs_output = []
+    def hook_size(module, input, output):
+        size_blobs_output.append(output.data.size())
+    input_sample = V(torch.randn(1,3,args.input_size,args.input_size))
+    for blob in blobs:
+        net._modules.get(blob).register_forward_hook(hook_size)
+
+    output_sample = net(input_sample)
+
+    input_dim = [args.input_size, args.input_size]
+    data_size = data.size(split) # the image size
     if limit is not None:
         data_size = min(data_size, limit)
 
@@ -85,16 +108,15 @@ def create_probe(
     rot = None
     if rotation_seed is not None:
         rot = {}
-    for blob in blobs:
-        shape = (data_size, ) + net.blobs[blob].data.shape[1:]
+    for idx, blob in enumerate(blobs):
+        #shape = (data_size, ) + net.blobs[blob].data.shape[1:]
+        shape = (data_size, int(size_blobs_output[idx][1]), int(size_blobs_output[idx][2]),int(size_blobs_output[idx][3]))
         out[blob] = ed.open_mmap(blob=blob, mode='w+', shape=shape)
-        # Find the shortest path through the network to the target blob
-        fieldmap, _ = upsample.composed_fieldmap(np.layer, blob)
-        # Compute random rotation for each blob, if needed
-        if rot is not None:
-            rot[blob] = rotate.randomRotationPowers(
-                shape[1], [rotation_power], rotation_seed,
-                unpermute=rotation_unpermute)[0]
+
+        # Rather than use the exact RF, here we use some heuristics to compute the approximate RF
+        size_RF = (args.input_size/size_blobs_output[idx][2], args.input_size/size_blobs_output[idx][3])
+        fieldmap = ((0, 0), size_RF, size_RF)
+
         ed.save_info(blob=blob, data=dict(
             name=blob, shape=shape, fieldmap=fieldmap))
 
@@ -107,7 +129,17 @@ def create_probe(
     start_time = time.time()
     last_batch_time = start_time
     batch_size = 0
+    net.cuda()
+
+    # hook the feature extractor
+    features_blobs = []
+    def hook_feature(module, input, output):
+        features_blobs.append(output.data.cpu().numpy())
+    for blob in blobs:
+        net._modules.get(blob).register_forward_hook(hook_feature)
+
     for batch in pf.tensor_batches(bgr_mean=mean):
+        del features_blobs[:] # clear up the feature basket
         batch_time = time.time()
         rate = index / (batch_time - start_time + 1e-15)
         batch_rate = batch_size / (batch_time - last_batch_time + 1e-15)
@@ -123,16 +155,15 @@ def create_probe(
             inp = inp[:batch_size]
         if colordepth == 1:
             inp = numpy.mean(inp, axis=1, keepdims=True)
-        net.blobs[input_blob].reshape(*(inp.shape))
-        net.blobs[input_blob].data[...] = inp
-        result = net.forward(blobs=blobs)
-        if rot is not None:
-            for key in out.keys():
-                result[key] = numpy.swapaxes(numpy.tensordot(
-                        rot[key], result[key], axes=((1,), (1,))), 0, 1)
-        # print 'Computation done'
-        for key in out.keys():
-            out[key][index:index + batch_size] = result[key]
+        # previous feedforward case
+        inp = inp[:,::-1,:,:]
+        inp_tensor = V(torch.from_numpy(inp.copy()))
+        inp_tensor.div_(255.0*0.224) # approximately normalize the input to make the images scaled at around 1.
+        inp_tensor = inp_tensor.cuda()
+        result = net.forward(inp_tensor)
+        # output the hooked feature
+        for i, key in enumerate(blobs):
+            out[key][index:index+batch_size] = numpy.copy(features_blobs[i][:batch_size])
         # print 'Recording data in mmap done'
         index += batch_size
         if index >= data_size:
@@ -210,7 +241,8 @@ if __name__ == '__main__':
                 help='the deploy prototext defining the net')
         parser.add_argument(
                 '--weights',
-                help='the caffemodel file of weights for the net')
+                default=None,
+                help='the pretrained weight')
         parser.add_argument(
                 '--mean',
                 nargs='*', type=float,
@@ -227,8 +259,12 @@ if __name__ == '__main__':
                 help='limit dataset to this size')
         parser.add_argument(
                 '--batch_size',
-                type=int, default=256,
+                type=int, default=64,
                 help='the batch size to use')
+        parser.add_argument(
+                '--input_size',
+                type=int, default=224,
+                help='the image size input to the network(usually it is 224x224, but alexnet uses 227x227)')
         parser.add_argument(
                 '--ahead',
                 type=int, default=4,
@@ -240,25 +276,23 @@ if __name__ == '__main__':
         parser.add_argument(
                 '--rotation_power',
                 type=float, default=1.0,
-                help='the power of the random rotation')
-        parser.add_argument(
-                '--rotation_unpermute',
-                type=int, default=0,
-                help='set to 1 to unpermute random rotation')
+                help='the power of hte random rotation')
         parser.add_argument(
                 '--colordepth',
                 type=int, default=3,
                 help='set to 1 for grayscale')
+        parser.add_argument(
+                '--num_classes',
+                type=int, default=365,
+                help='the number of classes for the network output(default is 365)')
+
         args = parser.parse_args()
-        
         create_probe(
             args.directory, args.dataset, args.definition, args.weights,
             numpy.array(args.mean, dtype=numpy.float32), args.blobs,
             batch_size=args.batch_size, ahead=args.ahead, limit=args.limit,
             colordepth=args.colordepth,
-            rotation_seed=args.rotation_seed,
-            rotation_power=args.rotation_power,
-            rotation_unpermute=args.rotation_unpermute,
+            rotation_seed=args.rotation_seed, rotation_power=args.rotation_power,
             split=args.split, cl_args=args, verbose=True)
     except:
         traceback.print_exc(file=sys.stdout)
