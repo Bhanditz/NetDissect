@@ -82,22 +82,43 @@ fi
 
 
 # OpenSurfaces
-if [ ! -f sourcedata/opensurfaces/photos.csv ]
+# if [ ! -f sourcedata/opensurfaces/photos.csv ]
+# then
+# 
+# echo "Downloading OpenSurfaces Dataset"
+# mkdir -p sourcedata/opensurfaces
+# pushd sourcedata/opensurfaces
+# wget --progress=bar \
+#    http://labelmaterial.s3.amazonaws.com/release/opensurfaces-release-0.zip \
+#    -O opensurfaces-release-0.zip
+# unzip opensurfaces-release-0.zip
+# rm opensurfaces-release-0.zip
+# PROCESS=process_opensurfaces_release_0.py
+# wget --progress=bar \
+#   http://labelmaterial.s3.amazonaws.com/release/$PROCESS \
+#   -O $PROCESS
+# python $PROCESS
+# popd
+# 
+# fi
+
+
+# MINC
+if [ ! -f sourcedata/minc/photos.csv ]
 then
 
-echo "Downloading OpenSurfaces Dataset"
-mkdir -p sourcedata/opensurfaces
-pushd sourcedata/opensurfaces
+echo "Downloading MINC Dataset"
+mkdir -p sourcedata/minc
+pushd sourcedata/minc
 wget --progress=bar \
-   http://labelmaterial.s3.amazonaws.com/release/opensurfaces-release-0.zip \
-   -O opensurfaces-release-0.zip
-unzip opensurfaces-release-0.zip
-rm opensurfaces-release-0.zip
-PROCESS=process_opensurfaces_release_0.py
+   http://opensurfaces.cs.cornell.edu/static/minc/minc-original-photo.tar.gz
+   -O minc-original-photo.tar.gz
+tar xvzf minc-original-photo.tar.gz
+rm minc-original-photo.tar.gz
 wget --progress=bar \
-  http://labelmaterial.s3.amazonaws.com/release/$PROCESS \
-  -O $PROCESS
-python $PROCESS
+  http://opensurfaces.cs.cornell.edu/static/minc/minc.tar.gz
+tar xvzf minc.tar.gz
+rm minc.tar.gz
 popd
 
 fi
