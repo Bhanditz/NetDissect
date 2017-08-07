@@ -11,7 +11,7 @@ then
 fi
 
 # PASCAL 2010 Images
-if [ ! -f sourcedata/pascal/VOC2010/ImageSets/Segmentation/train.txt ]
+if [ ! -f sourcedata/pascal/VOC201?/ImageSets/Segmentation/train.txt ]
 then
 
 echo "Downloading Pascal VOC2010 images"
@@ -37,8 +37,8 @@ echo "Downloading Pascal Part Dataset"
 mkdir -p sourcedata/pascal/part
 pushd sourcedata/pascal/part
 wget --progress=bar \
-   http://www.stat.ucla.edu/~xianjie.chen/pascal_part_sourcedata/trainval.tar.gz \
-   -O trainval.tar.gz
+ http://www.stat.ucla.edu/~xianjie.chen/pascal_part_sourcedata/trainval.tar.gz \
+ -O trainval.tar.gz
 tar xvfz trainval.tar.gz
 rm trainval.tar.gz
 popd
@@ -104,19 +104,20 @@ fi
 
 
 # MINC
-if [ ! -f sourcedata/minc/photos.csv ]
+if [ ! -f sourcedata/minc/minc/minc-s/categories.txt ]
 then
 
 echo "Downloading MINC Dataset"
 mkdir -p sourcedata/minc
 pushd sourcedata/minc
 wget --progress=bar \
-   http://opensurfaces.cs.cornell.edu/static/minc/minc-original-photo.tar.gz
+   http://opensurfaces.cs.cornell.edu/static/minc/minc-original-photo.tar.gz \
    -O minc-original-photo.tar.gz
 tar xvzf minc-original-photo.tar.gz
 rm minc-original-photo.tar.gz
 wget --progress=bar \
-  http://opensurfaces.cs.cornell.edu/static/minc/minc.tar.gz
+  http://opensurfaces.cs.cornell.edu/static/minc/minc.tar.gz \
+  -O minc.tar.gz
 tar xvzf minc.tar.gz
 rm minc.tar.gz
 popd
@@ -132,7 +133,7 @@ echo "Downloading ADE20K Dataset"
 mkdir -p sourcedata/ade20k
 pushd sourcedata/ade20k
 wget --progress=bar \
-   http://groups.csail.mit.edu/vision/sourcedatas/ADE20K/ADE20K_2016_07_26.zip \
+   http://groups.csail.mit.edu/vision/datasets/ADE20K/ADE20K_2016_07_26.zip \
    -O ADE20K_2016_07_26.zip
 unzip ADE20K_2016_07_26.zip
 rm ADE20K_2016_07_26.zip
