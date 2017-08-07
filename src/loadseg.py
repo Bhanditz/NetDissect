@@ -216,7 +216,7 @@ class SegmentationData(AbstractSegmentation):
         for i in range(self.label_size(None)):
             maxcov, maxcat = max(
                     (((self.coverage(cat, catmap[cat][i]) /
-                        self.category[cat]['frequency'])
+                        self.category_frequency(cat))
                         if catmap[cat][i] else 0),
                         ic)
                     for ic, cat in enumerate(categories))
