@@ -63,7 +63,6 @@ def generate_study(od,
     for index, (directory, layer) in enumerate(layerlist):
         print 'processing', directory, layer
         ed = expdir.ExperimentDirectory(directory)
-        lv = layerviz.LayerViz(ed, layer)
         records = ed.load_csv(blob=layer, part='result')
         records.sort(key=lambda record: -float(record['score']))
         html.append('<div class="layer">')
@@ -73,6 +72,7 @@ def generate_study(od,
                     layernames[index % len(layernames)])
             html.append('</div>')
         if top_n > 0:
+            lv = layerviz.LayerViz(ed, layer)
             html.append('<div class="layergrid">')
             # Reoreder records to put unique labels first
             seen_count = {}
