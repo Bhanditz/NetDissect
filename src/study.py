@@ -41,6 +41,7 @@ def generate_study(od,
             imscale=72,
             imcount=1,
             threshold=0.04,
+            spacing=None,
             barscale=None,
             include_hist=True,
             show_labels=True,
@@ -59,13 +60,15 @@ def generate_study(od,
                     if float(record['score']) >= threshold)))
     if barscale is None:
         barscale = imscale * top_n
+    if spacing is None:
+        spacing = imscale / 3
     barwidth = float(barscale) / max_label_count
     for index, (directory, layer) in enumerate(layerlist):
         print 'processing', directory, layer
         ed = expdir.ExperimentDirectory(directory)
         records = ed.load_csv(blob=layer, part='result')
         records.sort(key=lambda record: -float(record['score']))
-        html.append('<div class="layer">')
+        html.append('<div class="layer" style="margin-bottom:%dpx">' % spacing)
         if layernames:
             html.append('<div class="layerleft" style="height:%dpx">' % imscale)
             html.append('<div class="layername">%s</div>' %
@@ -276,6 +279,10 @@ if __name__ == '__main__':
                 type=int, default=800,
                 help='thumbnail dimensions')
         parser.add_argument(
+                '--spacing',
+                type=int, default=None,
+                help='space between bars')
+        parser.add_argument(
                 '--show_labels',
                 type=int, default=1,
                 help='set to 0 to omit labels')
@@ -288,6 +295,7 @@ if __name__ == '__main__':
                 top_n=args.top_n,
                 imsize=args.imsize, imscale=args.imscale,
                 barscale=args.barscale,
+                spacing=args.spacing,
                 imcount=args.imcount,
                 include_hist=True,
                 show_labels=args.show_labels,
