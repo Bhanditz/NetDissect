@@ -33,6 +33,7 @@ def choose_concept_units(layerlist, conceptlist):
 
 def generate_study(od,
             layerlist,
+            layernames,
             concepts=None,
             categories=None,
             top_n=5,
@@ -42,6 +43,7 @@ def generate_study(od,
             threshold=0.04,
             barscale=None,
             include_hist=True,
+            show_labels=True,
             verbose=True):
     htmlfn = od.filename('html/study.html')
     print 'Generating html summary', htmlfn
@@ -58,57 +60,65 @@ def generate_study(od,
     if barscale is None:
         barscale = imscale * top_n
     barwidth = float(barscale) / max_label_count
-    for directory, layer in layerlist:
+    for index, (directory, layer) in enumerate(layerlist):
         print 'processing', directory, layer
         ed = expdir.ExperimentDirectory(directory)
         lv = layerviz.LayerViz(ed, layer)
         records = ed.load_csv(blob=layer, part='result')
         records.sort(key=lambda record: -float(record['score']))
         html.append('<div class="layer">')
-        html.append('<div class="layergrid">')
-        # Reoreder records to put unique labels first
-        seen_count = {}
-        if not categories:
-            categories = []
-        for record in records:
-            seen = seen_count.get(record['label'], 0)
-            record['seen_before'] = seen
-            seen_count[record['label']] = seen + 1
-        records.sort(key=lambda r: (
-            (float(r['score']) < threshold),
-            r['seen_before'],
-            categories.index(r['category'])
-                if r['category'] in categories else -1,
-            -float(r['score'])))
-        # Resort by IoU
-        records = sorted(records[:top_n], key=lambda r: -float(r['score']))
-        # Run through records in this sorted order.
-        for record in records:
-            print 'unit', record['unit'], record['label']
-            unit = int(record['unit']) - 1
-            imfn = 'image/%s-%s-%04d-comp.jpg' % (
-                    expdir.fn_safe(os.path.basename(directory.rstrip('/'))),
-                    expdir.fn_safe(layer),
-                    unit)
-            imsave(od.filename('html/' + imfn),
-                    lv.unit_visualization(unit, tight=True))
-            html.append('<div class="unit">')
-            html.append('<img src="%s" height="%d">' % (imfn, imscale))
-            html.append('<div class="unitnum">%d</div>'
-                    % record['unit'])
-            html.append('<div class="unitlabel">%s</div>'
-                    % fix(record['label']))
-            html.append('<div class="iou">%.2f</div>'
-                    % float(record['score']))
+        if layernames:
+            html.append('<div class="layerleft" style="height:%dpx">' % imscale)
+            html.append('<div class="layername">%s</div>' %
+                    layernames[index % len(layernames)])
             html.append('</div>')
-        html.append('<div class="layername">%s %s</div>' %
-                (fix(directory), fix(layer)))
-        html.append('</div>')
+        if top_n > 0:
+            html.append('<div class="layergrid">')
+            # Reoreder records to put unique labels first
+            seen_count = {}
+            if not categories:
+                categories = []
+            for record in records:
+                seen = seen_count.get(record['label'], 0)
+                record['seen_before'] = seen
+                seen_count[record['label']] = seen + 1
+            records.sort(key=lambda r: (
+                (float(r['score']) < threshold),
+                r['seen_before'],
+                categories.index(r['category'])
+                    if r['category'] in categories else -1,
+                -float(r['score'])))
+            # Resort by IoU
+            records = sorted(records[:top_n], key=lambda r: -float(r['score']))
+            # Run through records in this sorted order.
+            for record in records:
+                print 'unit', record['unit'], record['label']
+                unit = int(record['unit']) - 1
+                imfn = 'image/%s-%s-%04d-comp.jpg' % (
+                        expdir.fn_safe(os.path.basename(directory.rstrip('/'))),
+                        expdir.fn_safe(layer),
+                        unit)
+                imsave(od.filename('html/' + imfn),
+                        lv.unit_visualization(unit, tight=True))
+                html.append('<div class="unit">')
+                html.append('<img src="%s" height="%d">' % (imfn, imscale))
+                html.append('<div class="unitnum">%d</div>'
+                        % record['unit'])
+                html.append('<div class="unitlabel">%s</div>'
+                        % fix(record['label']))
+                html.append('<div class="iou">%.2f</div>'
+                        % float(record['score']))
+                html.append('</div>')
+            html.append('<div class="layername">%s %s</div>' %
+                    (fix(directory), fix(layer)))
+            html.append('</div>')
         barfn = 'image/%s-%s-bargraph.svg' % (
                 expdir.fn_safe(os.path.basename(directory.rstrip('/'))),
                 expdir.fn_safe(layer))
         bargraph.bar_graph_svg(ed, layer, barheight=imscale,
+                textheight=imscale / 2 if show_labels else 0,
                 barwidth=barwidth, threshold=threshold,
+                show_labels=show_labels,
                 save=od.filename('html/' + barfn))
         html.append('<div class="layerhist">')
         html.append('<img src="%s">' % barfn)
@@ -150,10 +160,16 @@ body {
   vertical-align: top;
 }
 .layername {
-  display: none;
+  transform: translateX(-50%) translateY(-50%) rotate(-90deg);
+  position: absolute;
+  top: 50%;
+  left: 50%;
 }
-.layerhist {
-  margin-bottom: -80px;
+.layerleft {
+  width: 30px;
+  display: inline-block;
+  position: relative;
+  height: 100px;
 }
 .unitlabel {
   font-weight: bold;
@@ -220,6 +236,10 @@ if __name__ == '__main__':
                 nargs=2, metavar=('directory', 'blob'), action='append',
                 help='directory/blob pairs evaluate')
         parser.add_argument(
+                '--layername',
+                action='append',
+                help='displayed name for layer')
+        parser.add_argument(
                 '--concepts',
                 nargs='+',
                 help='concepts to seek')
@@ -255,9 +275,14 @@ if __name__ == '__main__':
                 '--barscale',
                 type=int, default=800,
                 help='thumbnail dimensions')
+        parser.add_argument(
+                '--show_labels',
+                type=int, default=1,
+                help='set to 0 to omit labels')
         args = parser.parse_args()
         od = expdir.ExperimentDirectory(args.outdir)
         generate_study(od, args.layer,
+                args.layername,
                 concepts=args.concepts,
                 categories=args.categories,
                 top_n=args.top_n,
@@ -265,6 +290,7 @@ if __name__ == '__main__':
                 barscale=args.barscale,
                 imcount=args.imcount,
                 include_hist=True,
+                show_labels=args.show_labels,
                 verbose=True)
     except:
         traceback.print_exc(file=sys.stdout)
