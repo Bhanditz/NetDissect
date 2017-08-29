@@ -9,7 +9,7 @@
 cd "$(dirname "$(dirname "$(readlink -f "$0")")")"
 
 # Remove dummy directories
-for DUMMY in dataset dissection sourcedata zoo
+for DUMMY in dataset dissection sourcedata zoo sample
 do
   if [ -h ${DUMMY} ]
   then

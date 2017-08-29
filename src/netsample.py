@@ -338,6 +338,7 @@ if __name__ == '__main__':
             args.directory, args.dataset, args.definition, args.weights,
             numpy.array(args.mean, dtype=numpy.float32), args.blobs,
             quantiles=args.quantiles, resolution=args.resolution,
+            stride=args.stride,
             buffersize=args.buffersize,
             output_mat=args.output_mat,
             batch_size=args.batch_size, ahead=args.ahead, limit=args.limit,

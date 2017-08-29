@@ -871,7 +871,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     image_size = (args.size, args.size)
-    seg_size = (args.size // 2, args.size // 2)
+    seg_size = (args.size, args.size)
+    # seg_size = (args.size // 2, args.size // 2)
 
     print 'CREATING NEW SEGMENTATION OF SIZE %d.\n' % args.size
     print 'Loading source segmentations.'

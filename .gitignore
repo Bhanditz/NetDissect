@@ -4,6 +4,7 @@ dataset
 dissection
 sourcedata
 zoo
+sample
 !/dataset/README.md
 !/dissection/README.md
 !/zoo/README.md
