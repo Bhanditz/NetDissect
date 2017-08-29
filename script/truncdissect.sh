@@ -205,7 +205,7 @@ fi
 # Step 5: we just run over the tally file to extract whatever score we
 # want to derive.  That gets summarized in a [layer]-result.csv file.
 if [ -z "${FORCE##*result*}" ] || \
-  ! ls $(printf " $WORKDIR/$DIR/%s-%t%d-result.csv" "${LAYERA[@]}" )
+  ! ls $(printf " $WORKDIR/$DIR/%s-t$TRUNC-result.csv" "${LAYERA[@]}" )
 then
 
 echo 'Generating result.csv'
@@ -226,8 +226,8 @@ fi
 
 # Step 6: now generate the HTML visualization and images.
 if [ -z "${FORCE##*report*}" ] || \
-  ! ls $(printf " $WORKDIR/$DIR/html/%s.html" "${LAYERA[@]}") || \
-  ! ls $(printf " $WORKDIR/$DIR/html/image/%s-bargraph.svg" "${LAYERA[@]}")
+  ! ls $(printf " $WORKDIR/$DIR/html/%s-t$TRUNC.html" "${LAYERA[@]}") || \
+  ! ls $(printf " $WORKDIR/$DIR/html/image/%s-t$TRUNC-bargraph.svg" "${LAYERA[@]}")
 then
 
 echo 'Generating report'
@@ -247,33 +247,6 @@ then
   exit 0
 fi
 
-#
-# Step 6: graph the results.
-if [ -z "${FORCE##*graph*}" ] || ! globexists $WORKDIR/$DIR/html/*-graph.png
-then
-
-# Compute text for labeling graphs.
-PERCENT=$(printf '%g%%' $(echo "scale=0; $THRESHOLD * 100" | bc))
-
-echo 'Generating graph'
-python src/graphprobe.py \
-    --directories $WORKDIR/$DIR \
-    --blobs $LAYERS \
-    --labels $LAYERS \
-    --threshold $THRESHOLD \
-    --include_total true \
-    --title "Interpretability By Layer ($PERCENT IOU)" \
-    --out $WORKDIR/$DIR/html/layer-graph.png
-
-[[ $? -ne 0 ]] && exit $?
-echo graphprobe > $WORKDIR/$DIR/job.done
-fi
-
-if [ "$WORKDIR" != "$WORKDIR" ]
-then
-rm -rf $WORKDIR/$DIR/
-[[ $? -ne 0 ]] && exit $?
-fi
 
 echo finished > $WORKDIR/$DIR/job.done
 

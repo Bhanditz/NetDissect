@@ -21,8 +21,9 @@ def generate_html_summary(ed, ds, layer,
         imsize=None, imcount=50, imscale=None, tally_stats=None,
         gridwidth=None, gap=3, limit=None, force=False,
         trunc=None, include_hist=False, threshold=0.04, verbose=False):
+    truncpart = trunc and ('-t%d' % trunc) or ''
     print 'Generating html summary', (
-        ed.filename('html/%s.html' % expdir.fn_safe(layer)))
+        ed.filename('html/%s%s.html' % (expdir.fn_safe(layer), truncpart)))
     # Grab tally stats
     # bestcat_pciou, name_pciou, score_pciou, _, _, _, _ = (tally_stats)
     if verbose:
@@ -33,12 +34,11 @@ def generate_html_summary(ed, ds, layer,
         imsize = layerprobe.input_dim[0]
     if imscale is None:
         imscale = imsize
-    top = max_act_indexes(layerprobe, count=imcount)
+    top = max_act_indexes(layerprobe, trunc=trunc, count=imcount)
     ed.ensure_dir('html','image')
     html = [html_prefix]
     rendered_order = []
-    truncpart = trunc and ('t%d-' % trunc) or ''
-    barfn = 'image/%s-%sbargraph.svg' % (
+    barfn = 'image/%s%s-bargraph.svg' % (
             expdir.fn_safe(layer), truncpart)
     bargraph.bar_graph_svg(ed, layer, barheight=100,
             barwidth=12, threshold=threshold, trunc=trunc,
@@ -79,8 +79,8 @@ def generate_html_summary(ed, ds, layer,
         record['score-order'] = i
     for label_order, record in enumerate(rendered_order):
         unit = int(record['unit']) - 1 # zero-based unit indexing
-        imfn = 'image/%s%s-%04d.jpg' % (
-                expdir.fn_safe(layer), gridname, unit)
+        imfn = 'image/%s%s%s-%04d.jpg' % (
+                expdir.fn_safe(layer), truncpart, gridname, unit)
         if force or not ed.has('html/%s' % imfn):
             if verbose:
                 print 'Visualizing %s unit %d' % (layer, unit)
@@ -115,9 +115,8 @@ def generate_html_summary(ed, ds, layer,
         html.append('</div') # Leave off > to eat spaces
     html.append('></div>')
     html.extend([html_suffix]);
-    truncpart = trunc and ('-t%d' % trunc) or ''
     with open(ed.filename('html/%s%s.html' % (
-        expdir.fn_safe(layer), truncpart), 'w') as f:
+        expdir.fn_safe(layer), truncpart)), 'w') as f:
         f.write('\n'.join(html))
 
 def instance_data(ds, i, normalize=True):
@@ -147,8 +146,8 @@ def activation_visualization(ds, layerprobe, unit, index, alpha=0.2):
     mask = activation_mask(layerprobe, unit, index, image.shape[:2])
     return (mask[:, :, numpy.newaxis] * (1 - alpha) + alpha) * image
 
-def max_act_indexes(layerprobe, count=10):
-    max_per_image = layerprobe.imgmax
+def max_act_indexes(layerprobe, trunc=None, count=10):
+    max_per_image = layerprobe.imgmax[:trunc]
     return max_per_image.argsort(axis=0)[:-1-count:-1,:].transpose()
 
 class LayerProbe:
@@ -412,6 +411,10 @@ if __name__ == '__main__':
                 type=int, default=50,
                 help='number of thumbnails to include')
         parser.add_argument(
+                '--trunc',
+                type=int, default=None,
+                help='truncate dataset size')
+        parser.add_argument(
                 '--threshold',
                 type=float, default=0.04,
                 help='minimum IoU to count as a detector')
@@ -425,6 +428,7 @@ if __name__ == '__main__':
                     gridwidth=args.gridwidth,
                     force=args.force,
                     threshold=args.threshold,
+                    trunc=args.trunc,
                     verbose=True)
     except:
         traceback.print_exc(file=sys.stdout)

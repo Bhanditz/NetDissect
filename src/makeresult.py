@@ -246,8 +246,8 @@ if __name__ == '__main__':
             layerprobe = LayerProbe(ed, ds, blob)
             tally_stats = score_tally_stats(ed, ds, layerprobe,
                     trunc=args.trunc, verbose=True)
-            if trunc is not None:
-                truncpart = 't%d-' % trunc
+            if args.trunc is not None:
+                truncpart = 't%d-' % args.trunc
             else:
                 truncpart = ''
             filename = ed.csv_filename(blob=blob, part='%sresult' % truncpart)
