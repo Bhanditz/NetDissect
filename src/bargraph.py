@@ -42,9 +42,11 @@ def bar_graph_svg(ed, blob, barheight, barwidth,
         order=None,
         show_labels=True,
         threshold=0.04,
+        trunc=None,
         rendered_order=None,
         save=None):
-    records = ed.load_csv(blob=blob, part='result')
+    truncpart = trunc and ('t%d-' % trunc) or ''
+    records = ed.load_csv(blob=blob, part='%sresult' % truncpart)
     # ['unit', 'category', 'label', 'score']
     # Examine each label
     label_cats = {}
@@ -98,7 +100,8 @@ def bar_graph_svg(ed, blob, barheight, barwidth,
     filename = None
     if save:
         if save == True:
-            filename = ed.filename('bargraph.svg', blob=blob, directory='html')
+            filename = ed.filename('%sbargraph.svg' % truncpart,
+                    blob=blob, directory='html')
         else:
             filename = save
         ed.ensure_dir('html')

@@ -20,7 +20,7 @@ def open_dataset(ed):
 def generate_html_summary(ed, ds, layer,
         imsize=None, imcount=50, imscale=None, tally_stats=None,
         gridwidth=None, gap=3, limit=None, force=False,
-        include_hist=False, threshold=0.04, verbose=False):
+        trunc=None, include_hist=False, threshold=0.04, verbose=False):
     print 'Generating html summary', (
         ed.filename('html/%s.html' % expdir.fn_safe(layer)))
     # Grab tally stats
@@ -37,10 +37,11 @@ def generate_html_summary(ed, ds, layer,
     ed.ensure_dir('html','image')
     html = [html_prefix]
     rendered_order = []
-    barfn = 'image/%s-bargraph.svg' % (
-            expdir.fn_safe(layer))
+    truncpart = trunc and ('t%d-' % trunc) or ''
+    barfn = 'image/%s-%sbargraph.svg' % (
+            expdir.fn_safe(layer), truncpart)
     bargraph.bar_graph_svg(ed, layer, barheight=100,
-            barwidth=12, threshold=threshold,
+            barwidth=12, threshold=threshold, trunc=trunc,
             rendered_order=rendered_order,
             save=ed.filename('html/' + barfn))
     html.extend([
@@ -114,7 +115,9 @@ def generate_html_summary(ed, ds, layer,
         html.append('</div') # Leave off > to eat spaces
     html.append('></div>')
     html.extend([html_suffix]);
-    with open(ed.filename('html/%s.html' % expdir.fn_safe(layer)), 'w') as f:
+    truncpart = trunc and ('-t%d' % trunc) or ''
+    with open(ed.filename('html/%s%s.html' % (
+        expdir.fn_safe(layer), truncpart), 'w') as f:
         f.write('\n'.join(html))
 
 def instance_data(ds, i, normalize=True):

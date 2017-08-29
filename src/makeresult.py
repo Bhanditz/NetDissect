@@ -13,7 +13,7 @@ import expdir
 def open_dataset(ed):
     return loadseg.SegmentationData(ed.load_info().dataset)
 
-def score_tally_stats(ed, ds, layerprobe, verbose=False):
+def score_tally_stats(ed, ds, layerprobe, trunc=None, verbose=False):
     # First, score every unit
     if verbose:
         print 'Adding tallys of unit/label alignments.'
@@ -22,10 +22,10 @@ def score_tally_stats(ed, ds, layerprobe, verbose=False):
     # Provides a category for each label in the dataset.
     primary_categories = primary_categories_per_index(ds)
     # tally activations, groundtruth, and intersection
-    ta, tg, ti = summarize_tally(ds, layerprobe)
+    ta, tg, ti = summarize_tally(ds, layerprobe, trunc)
     labelcat = onehot(primary_categories)
     # also tally category-groundtruth-presence
-    tc = count_act_with_labelcat(ds, layerprobe)
+    tc = count_act_with_labelcat(ds, layerprobe, trunc)
     # If we were doing per-category activations p, then:
     # c = numpy.dot(p, labelcat.transpose())
     epsilon = 1e-20 # avoid division-by-zero
@@ -114,9 +114,9 @@ def generate_csv_summary(
                 })
             writer.writerow(data)
 
-def summarize_tally(ds, layerprobe):
+def summarize_tally(ds, layerprobe, trunc=None):
     cat_count = len(ds.category_names())
-    tally = layerprobe.tally
+    tally = layerprobe.tally[:trunc]
     unit_size = layerprobe.shape[1]
     label_size = ds.label_size()
     count = numpy.zeros(
@@ -136,7 +136,7 @@ def summarize_tally(ds, layerprobe):
     # return count_a, count_c, count_g, count_i
     return count_a, count_g, count_i
 
-def count_act_with_labelcat(ds, layerprobe):
+def count_act_with_labelcat(ds, layerprobe, trunc=None):
     # Because our dataaset is sparse, instead of using count_a to count
     # all activations, we can compute count_act_with_labelcat to count
     # activations only within those images which contain an instance
@@ -144,7 +144,7 @@ def count_act_with_labelcat(ds, layerprobe):
     labelcat = onehot(primary_categories_per_index(ds))
     # Be sure to zero out the background label - it belongs to no category.
     labelcat[0,:] = 0
-    tally = layerprobe.tally
+    tally = layerprobe.tally[:trunc]
     unit_size = layerprobe.shape[1]
     label_size = ds.label_size()
     count = numpy.zeros((unit_size, labelcat.shape[1]), dtype='int64')
@@ -235,13 +235,22 @@ if __name__ == '__main__':
                 '--blobs',
                 nargs='*',
                 help='network blob names to visualize')
+        parser.add_argument(
+                '--trunc',
+                type=int, default=None,
+                help='limit probe dataset to this size')
         args = parser.parse_args()
         ed = expdir.ExperimentDirectory(args.directory)
         ds = open_dataset(ed)
         for blob in args.blobs:
             layerprobe = LayerProbe(ed, ds, blob)
-            tally_stats = score_tally_stats(ed, ds, layerprobe, verbose=True)
-            filename = ed.csv_filename(blob=blob, part='result')
+            tally_stats = score_tally_stats(ed, ds, layerprobe,
+                    trunc=args.trunc, verbose=True)
+            if trunc is not None:
+                truncpart = 't%d-' % trunc
+            else:
+                truncpart = ''
+            filename = ed.csv_filename(blob=blob, part='%sresult' % truncpart)
             generate_csv_summary(blob, filename, tally_stats, ds,
                         order=(args.csvorder.split(',')
                             if args.csvorder else None), verbose=True)
