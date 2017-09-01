@@ -42,6 +42,10 @@ def bar_graph_svg(ed, blob, barheight, barwidth,
         textheight=None,
         order=None,
         show_labels=True,
+        show_leftaxis=None,
+        show_uniquecount=False,
+        textsize=None,
+        vmargin=None,
         threshold=0.04,
         rendered_order=None,
         save=None):
@@ -104,38 +108,50 @@ def bar_graph_svg(ed, blob, barheight, barwidth,
             filename = save
         ed.ensure_dir('html')
     return make_svg_bargraph(labels, heights, categories,
-            barheight, barwidth, textheight, show_labels, filename)
+            barheight, barwidth, textheight, textsize, vmargin,
+            show_labels, show_leftaxis, show_uniquecount, filename)
 
 def make_svg_bargraph(labels, heights, categories,
-        barheight=100, barwidth=12, textheight=None,
-        show_labels=True, filename=None):
+        barheight=100, barwidth=12, textheight=None, textsize=None,
+        vmargin=None,
+        show_labels=True, show_leftaxis=None, show_uniquecount=True,
+        filename=None):
     unitheight = float(barheight) / max(heights)
     if textheight is None:
         textheight = barheight if show_labels else 0
-    labelsize = float(barwidth)
+    if show_leftaxis is None:
+        show_leftaxis = show_labels
     gap = float(barwidth) / 4
-    textsize = barwidth + gap
+    labelsize = float(barwidth)
+    if textsize is None:
+        textsize = barwidth + gap
+    if vmargin is None:
+        vmargin = 0
     rollup = max(heights)
     textmargin = float(labelsize) * 2 / 3
-    leftmargin = 32 if show_labels else 0
-    rightmargin = 32 if show_labels else 0
+    leftmargin = 32 if show_leftaxis else 0
+    rightmargin = 32 if show_uniquecount else 0
+    topmargin = vmargin
+    bottommargin = vmargin
     svgwidth = len(heights) * (barwidth + gap) + leftmargin + rightmargin
-    svgheight = barheight + textheight
+    svgheight = barheight + textheight + topmargin + bottommargin
 
     # create an SVG XML element
     svg = et.Element('svg', width=str(svgwidth), height=str(svgheight),
             version='1.1', xmlns='http://www.w3.org/2000/svg')
  
     # Draw the bar graph
-    basey = svgheight - textheight
+    basey = svgheight - textheight - bottommargin
     x = leftmargin
     # Add units scale on left
-    if show_labels:
-        for h in [1, (max(heights) + 1) // 2, max(heights)]:
+    if show_leftaxis:
+        labels
+        for h in [0 if vmargin else 1, (max(heights) + 1) // 2, max(heights)]:
             et.SubElement(svg, 'text', x='0', y='0',
                 style=(
                 'font-family:sans-serif;font-size:%dpx;text-anchor:end;'+
-                'alignment-baseline:hanging;' +
+                ('alignment-baseline:middle;'
+                    if vmargin else 'alignment-baseline:hanging;') +
                 'transform:translate(%dpx, %dpx);') %
                 (textsize, x - gap, basey - h * unitheight)).text = str(h)
         et.SubElement(svg, 'text', x='0', y='0',
@@ -173,6 +189,13 @@ def make_svg_bargraph(labels, heights, categories,
                 (labelsize, x, basey + textmargin)).text = fix(label)
         x += gap
         catcount -= 1
+    if show_uniquecount:
+        et.SubElement(svg, 'text', x=str(x + 16),
+                y=str(basey - rollup * unitheight / 2),
+                style=
+                'alignment-baseline:middle;' +
+                'font-family:sans-serif;font-size:%dpx;text-anchor:middle;' %
+                (textsize+2)).text = '%d' % len(heights)
     # Text labels for each category
     if show_labels:
         x = leftmargin

@@ -41,10 +41,13 @@ def generate_study(od,
             imscale=72,
             imcount=1,
             threshold=0.04,
-            spacing=None,
+            textsize=None,
             barscale=None,
+            vmargin=None,
             include_hist=True,
             show_labels=True,
+            show_leftaxis=None,
+            show_uniquecount=False,
             verbose=True):
     htmlfn = od.filename('html/study.html')
     print 'Generating html summary', htmlfn
@@ -57,20 +60,20 @@ def generate_study(od,
         records = ed.load_csv(blob=layer, part='result')
         max_label_count = max(max_label_count,
             len(set(record['label'] for record in records
-                    if float(record['score']) >= threshold)))
+                    if float(record['score']) >= threshold
+                    and (not categories or record['category'] in categories))))
     if barscale is None:
         barscale = imscale * top_n
-    if spacing is None:
-        spacing = imscale / 3
     barwidth = float(barscale) / max_label_count
     for index, (directory, layer) in enumerate(layerlist):
         print 'processing', directory, layer
         ed = expdir.ExperimentDirectory(directory)
         records = ed.load_csv(blob=layer, part='result')
         records.sort(key=lambda record: -float(record['score']))
-        html.append('<div class="layer" style="margin-bottom:%dpx">' % spacing)
+        html.append('<div class="layer">')
         if layernames:
-            html.append('<div class="layerleft" style="height:%dpx">' % imscale)
+            html.append('<div class="layerleft" style="height:%dpx">' %
+                    (imscale + 2 * (vmargin or 0)))
             html.append('<div class="layername">%s</div>' %
                     layernames[index % len(layernames)])
             html.append('</div>')
@@ -118,10 +121,17 @@ def generate_study(od,
         barfn = 'image/%s-%s-bargraph.svg' % (
                 expdir.fn_safe(os.path.basename(directory.rstrip('/'))),
                 expdir.fn_safe(layer))
-        bargraph.bar_graph_svg(ed, layer, barheight=imscale,
+        bargraph.bar_graph_svg(ed, layer,
+                order=categories,
+                barheight=imscale,
                 textheight=imscale / 2 if show_labels else 0,
-                barwidth=barwidth, threshold=threshold,
+                barwidth=barwidth,
+                textsize=textsize,
+                vmargin=vmargin,
+                threshold=threshold,
                 show_labels=show_labels,
+                show_leftaxis=show_leftaxis,
+                show_uniquecount=show_uniquecount,
                 save=od.filename('html/' + barfn))
         html.append('<div class="layerhist">')
         html.append('<img src="%s">' % barfn)
@@ -164,6 +174,7 @@ body {
 }
 .layername {
   transform: translateX(-50%) translateY(-50%) rotate(-90deg);
+  text-align: center;
   position: absolute;
   top: 50%;
   left: 50%;
@@ -279,13 +290,25 @@ if __name__ == '__main__':
                 type=int, default=800,
                 help='thumbnail dimensions')
         parser.add_argument(
-                '--spacing',
+                '--textsize',
                 type=int, default=None,
-                help='space between bars')
+                help='font size')
+        parser.add_argument(
+                '--vmargin',
+                type=int, default=None,
+                help='vertical margin')
         parser.add_argument(
                 '--show_labels',
                 type=int, default=1,
                 help='set to 0 to omit labels')
+        parser.add_argument(
+                '--show_uniquecount',
+                type=int, default=0,
+                help='set to 1 to show unique count at right')
+        parser.add_argument(
+                '--show_leftaxis',
+                type=int, default=None,
+                help='set to 0 to omit leftaxis labels')
         args = parser.parse_args()
         od = expdir.ExperimentDirectory(args.outdir)
         generate_study(od, args.layer,
@@ -295,10 +318,13 @@ if __name__ == '__main__':
                 top_n=args.top_n,
                 imsize=args.imsize, imscale=args.imscale,
                 barscale=args.barscale,
-                spacing=args.spacing,
+                textsize=args.textsize,
+                vmargin=args.vmargin,
                 imcount=args.imcount,
                 include_hist=True,
                 show_labels=args.show_labels,
+                show_leftaxis=args.show_leftaxis,
+                show_uniquecount=args.show_uniquecount,
                 verbose=True)
     except:
         traceback.print_exc(file=sys.stdout)
