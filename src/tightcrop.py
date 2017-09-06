@@ -10,8 +10,6 @@ import numpy as np
 import scipy.ndimage as ndimage
 import scipy.spatial as spatial
 import scipy.misc as misc
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 import urllib2
 
 from scipy.misc import imresize, imread, imsave
