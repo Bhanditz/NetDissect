@@ -103,3 +103,55 @@ class LayerViz:
 
     # TODO: consider returning segmentation visualizations etc.
 
+if __name__ == '__main__':
+    import sys
+    import traceback
+    import argparse
+
+    parser = argparse.ArgumentParser(description=
+        'Visualize a specific unit of a probed model.')
+    parser.add_argument(
+            '--directory',
+            default='.', required=True,
+            help='directory containing probed units')
+    parser.add_argument(
+            '--blob', required=True,
+            help='layer to visualize')
+    parser.add_argument(
+            '--unit', type=int, required=True,
+            help='unit number to visualize')
+    parser.add_argument(
+            '--output', required=True,
+            help='output filename for visualization')
+    parser.add_argument(
+            '--count',
+            type=int, default=1,
+            help='number of images to show in the strip')
+    parser.add_argument(
+            '--gap',
+            type=int, default=3,
+            help='white pixels between images')
+    parser.add_argument(
+            '--height',
+            type=int, default=None,
+            help='the image height to use')
+    parser.add_argument(
+            '--gridwidth',
+            type=int, default=None,
+            help='number of images to show in a single row')
+    parser.add_argument(
+            '--tight',
+            type=int, default=0,
+            help='set to 1 to apply tight cropping and zooming')
+    args = parser.parse_args()
+
+    ed = expdir.ExperimentDirectory(args.directory)
+    lv = LayerViz(ed, args.blob)
+    lv.unit_visualization(args.unit,
+            count=args.count,
+            shape=args.height and (args.height, args.height),
+            gap=args.gap,
+            gridwidth=args.gridwidth,
+            tight=args.tight,
+            saveas=args.output)
+

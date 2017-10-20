@@ -187,6 +187,8 @@ echo TALLYBATCH = "${TALLYBATCH}"
 echo MEAN = "${MEAN}"
 echo FORCE = "${FORCE}"
 echo ENDAFTER = "${ENDAFTER}"
+echo ROTATION_SEED = "${ROTATION_SEED}"
+echo ROTATION_POWER = "${ROTATION_POWER}"
 
 # Set up rotation flag if rotation is selected
 ROTATION_FLAG=""

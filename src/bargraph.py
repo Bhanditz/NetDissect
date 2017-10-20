@@ -217,7 +217,7 @@ def make_svg_bargraph(labels, heights, categories,
         f.write('<?xml version=\"1.0\" standalone=\"no\"?>\n')
         f.write('<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\"\n')
         f.write('\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n')
-        f.write(result)
+        f.write(result.decode('utf-8'))
         f.close()
     return result
 

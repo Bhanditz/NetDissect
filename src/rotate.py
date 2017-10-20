@@ -26,6 +26,23 @@ def randomRotation(n, seed=None):
 
 def randomRotationPowers(n, powers, seed=None, unpermute=False):
     RR = randomRotation(n, seed)
+    if unpermute:
+        # If unpermuting, sort the rows by max value
+        biggest_first = numpy.argsort(-numpy.amax(RR, axis=1))
+        # In greedy order, assign permutation order
+        cols_seen = set()
+        permutation = numpy.zeros((n, n))
+        for row in biggest_first:
+            # For each row, find the max col to which it is closest
+            biggest_cols = numpy.argsort(-RR[row])
+            for col in biggest_cols:
+                if col not in cols_seen:
+                    # Bring the row back to that slot if not taken
+                    permutation[col,row] = 1
+                    cols_seen.add(col)
+                    break
+        # Now the target rotation is P * RR
+        RR = numpy.dot(permutation, RR)
     # Reduce the matrix to canonical (block-diag) form using schur decomp
     # (TODO: Consider implementing the stabilized variant of the algorithm
     # by Gragg called UHQR which is tailored to solve this decomposition for
@@ -36,35 +53,13 @@ def randomRotationPowers(n, powers, seed=None, unpermute=False):
     # read the angles off the diagonal and use them to construct a perfectly
     # block diagonal form.
     RA = numpy.arccos(numpy.clip(numpy.diag(T), -1, 1))[0:n:2]
-    if unpermute:
-        # If unpermuting, first figure out full rotation matrix
-        B = [numpy.cos([[a, a + numpy.pi/2], [a - numpy.pi/2, a]]) for a in RA]
-        BD = scipy.linalg.block_diag(*B)
-        fullrot = numpy.dot(numpy.dot(W, BD), W.transpose())
-        # Then sort the rows by max value
-        biggest_first = numpy.argsort(-numpy.amax(fullrot, axis=1))
-        # In greedy order, assign permutation order
-        cols_seen = set()
-        permutation = numpy.zeros((n, n))
-        for row in biggest_first:
-            # For each row, find the max col to which it is closest
-            biggest_cols = numpy.argsort(-fullrot[row])
-            for col in biggest_cols:
-                if col not in cols_seen:
-                    # Bring the row back to that slot if not taken
-                    permutation[col,row] = 1
-                    cols_seen.add(col)
-                    break
-    else:
-        permutation = numpy.eye(n)
     # Now form the requested powers of W * (RA^p) * W'
     result = []
     for p in powers:
         A = [a * p for a in RA]
         B = [numpy.cos([[a, a + numpy.pi/2], [a - numpy.pi/2, a]]) for a in A]
         BD = scipy.linalg.block_diag(*B)
-        result.append(numpy.dot(permutation,
-            numpy.dot(numpy.dot(W, BD), W.transpose())))
+        result.append(numpy.dot(numpy.dot(W, BD), W.transpose()))
     return result
 
 def randomNearIdentity(n, scale, seed=None):
